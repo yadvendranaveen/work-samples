@@ -1,0 +1,63 @@
+def GITHUB_REPO = "hidden for privacy and security"
+def RELEASE_NAME = "hidden for privacy and security-${STACK_COUNT}"
+def DOCKER_REPOSITORY = "hidden for privacy and security"
+def TEAM = "facnt"
+def SERVICE = "bahikhata"
+def DEPLOY_TIMEOUT = "300" // Increase this further if you think your service needs more time to start
+
+@Library('hidden for privacy and security') _
+
+pipeline {
+    agent {
+        label "label-loc-se-1-master"
+    }
+    tools {
+        jdk 'jdk-8'
+        maven 'mvn35'
+    }
+    stages {
+        stage("Code checkout") {
+            steps {
+                script {
+                    checkout([
+                            $class                           : 'GitSCM',
+                            branches                         : [[name: "${params.BRANCH}"]],
+                            doGenerateSubmoduleConfigurations: false,
+                            extensions                       : [],
+                            submoduleCfg                     : [],
+                            userRemoteConfigs                : [[
+                                                                        credentialsId: '',
+                                                                        url          : "${GITHUB_REPO}"
+                                                                ]]
+                    ])
+                }
+            }
+        }
+        stage('Build') {
+            steps {
+
+                sh """
+        export PATH=/usr/local/bin:$PATH
+        mvn clean install
+        """
+            }
+        }
+        stage("Image build and push") {
+            steps {
+                script {
+                    IMAGE = docker.build_image(repository: "$DOCKER_REPOSITORY")
+                }
+            }
+        }
+        stage("deployment") {
+            agent {
+                label "label-loc-stg-k8s-0"
+            }
+            steps {
+                script {
+                    helm.deploy_microservice("$RELEASE_NAME", "$IMAGE", "$DEPLOY_TIMEOUT")
+                }
+            }
+        }
+    }
+}
